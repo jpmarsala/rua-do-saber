@@ -1,0 +1,107 @@
+"use client";
+
+import { Suspense, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get("redirect") ?? "/";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const supabase = createClient();
+    if (!supabase) {
+      setError("Supabase não configurado.");
+      setLoading(false);
+      return;
+    }
+    const { error: signError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    setLoading(false);
+    if (signError) {
+      setError(signError.message);
+      return;
+    }
+    router.push(redirect);
+    router.refresh();
+  }
+
+  return (
+    <div className="w-full max-w-sm rounded-xl border border-streaming-border bg-streaming-bg-card p-8 shadow-xl">
+      <h1 className="font-display text-2xl tracking-tight text-white mb-2">Entrar</h1>
+      <p className="text-streaming-muted text-sm mb-6">
+        Use seu e-mail e senha para acessar a plataforma.
+      </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="email" className="block text-sm font-medium text-streaming-muted mb-1">
+            E-mail
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2.5 rounded-lg border border-streaming-border bg-streaming-bg text-white placeholder-streaming-muted focus:ring-2 focus:ring-primary focus:border-primary"
+            placeholder="seu@email.com"
+          />
+        </div>
+        <div>
+          <label htmlFor="password" className="block text-sm font-medium text-streaming-muted mb-1">
+            Senha
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2.5 rounded-lg border border-streaming-border bg-streaming-bg text-white placeholder-streaming-muted focus:ring-2 focus:ring-primary focus:border-primary"
+          />
+        </div>
+        <p className="text-right text-sm">
+          <Link href="/auth/esqueci-senha" className="text-primary hover:underline">Esqueci minha senha</Link>
+        </p>
+        {error && (
+          <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 rounded-lg bg-primary text-white font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50"
+        >
+          {loading ? "Entrando…" : "Entrar"}
+        </button>
+      </form>
+      <p className="mt-6 text-center text-sm text-streaming-muted">
+        <Link href="/" className="text-primary hover:underline">
+          Voltar ao início
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className="min-h-[70vh] flex items-center justify-center px-4 py-16">
+      <Suspense fallback={<div className="w-full max-w-sm h-64 rounded-xl bg-streaming-bg-card border border-streaming-border animate-pulse" />}>
+        <LoginForm />
+      </Suspense>
+    </div>
+  );
+}

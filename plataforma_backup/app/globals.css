@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #0ea5e9;
+  --color-secondary: #64748b;
+  --color-accent: #f59e0b;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}

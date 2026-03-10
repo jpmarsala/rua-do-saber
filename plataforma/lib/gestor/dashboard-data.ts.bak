@@ -1,0 +1,147 @@
+import { createServiceRoleClient } from "@/lib/supabase/server-service";
+import { getSession } from "@/lib/auth/get-session";
+
+export interface GestorDashboardStats {
+  schoolsCount: number;
+  teachersCount: number;
+  classesCount: number;
+  studentsCount: number;
+}
+
+/** Para super_admin: pode passar tenantId (ex.: searchParams). Para manager: usa session.tenantId. */
+function getEffectiveTenantId(tenantIdOverride: string | null | undefined): string | null {
+  return tenantIdOverride ?? null;
+}
+
+export async function getGestorDashboardStats(
+  tenantIdOverride?: string | null
+): Promise<GestorDashboardStats | null> {
+  const session = await getSession();
+  if (!session) return null;
+  const db = createServiceRoleClient();
+  if (!db) return null;
+
+  const tenantId =
+    session.role === "super_admin"
+      ? getEffectiveTenantId(tenantIdOverride) ?? session.tenantId
+      : session.role === "manager"
+        ? session.tenantId
+        : null;
+  if (!tenantId) return null;
+
+  const [schoolsRes, teachersRes, studentsRes] = await Promise.all([
+    db.from("schools").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("active", true),
+    db.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role", "teacher").eq("status", "active"),
+    db.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role", "student").eq("status", "active"),
+  ]);
+
+  const { data: schoolList } = await db.from("schools").select("id").eq("tenant_id", tenantId);
+  const schoolIds = (schoolList ?? []).map((s) => s.id);
+  let classesCount = 0;
+  if (schoolIds.length > 0) {
+    const classesRes = await db.from("classes").select("id", { count: "exact", head: true }).in("school_id", schoolIds);
+    classesCount = classesRes.count ?? 0;
+  }
+
+  return {
+    schoolsCount: schoolsRes.count ?? 0,
+    teachersCount: teachersRes.count ?? 0,
+    classesCount,
+    studentsCount: studentsRes.count ?? 0,
+  };
+}
+
+/** Lista de clientes (tenants) para super_admin escolher no painel do gestor. */
+export interface GestorTenantOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export async function getTenantsForGestor(): Promise<GestorTenantOption[]> {
+  const session = await getSession();
+  if (session?.role !== "super_admin") return [];
+  const db = createServiceRoleClient();
+  if (!db) return [];
+  const { data } = await db.from("tenants").select("id, name, slug").eq("active", true).order("name");
+  return data ?? [];
+}
+
+export interface GestorSchool {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export async function getGestorSchools(
+  tenantIdOverride?: string | null
+): Promise<GestorSchool[]> {
+  const session = await getSession();
+  if (!session) return [];
+  const db = createServiceRoleClient();
+  if (!db) return [];
+  const tenantId =
+    session.role === "super_admin"
+      ? getEffectiveTenantId(tenantIdOverride) ?? session.tenantId
+      : session.role === "manager"
+        ? session.tenantId
+        : null;
+  if (!tenantId) return [];
+  const { data } = await db.from("schools").select("id, name, active").eq("tenant_id", tenantId).order("name");
+  return data ?? [];
+}
+
+export interface GestorTeacher {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+}
+
+export async function getGestorTeachers(
+  tenantIdOverride?: string | null
+): Promise<GestorTeacher[]> {
+  const session = await getSession();
+  if (!session) return [];
+  const db = createServiceRoleClient();
+  if (!db) return [];
+  const tenantId =
+    session.role === "super_admin"
+      ? getEffectiveTenantId(tenantIdOverride) ?? session.tenantId
+      : session.role === "manager"
+        ? session.tenantId
+        : null;
+  if (!tenantId) return [];
+  const { data } = await db.from("profiles").select("id, full_name, email").eq("tenant_id", tenantId).eq("role", "teacher").order("full_name");
+  return data ?? [];
+}
+
+export interface GestorClass {
+  id: string;
+  name: string;
+  schoolName: string;
+}
+
+export async function getGestorClasses(
+  tenantIdOverride?: string | null
+): Promise<GestorClass[]> {
+  const session = await getSession();
+  if (!session) return [];
+  const db = createServiceRoleClient();
+  if (!db) return [];
+  const tenantId =
+    session.role === "super_admin"
+      ? getEffectiveTenantId(tenantIdOverride) ?? session.tenantId
+      : session.role === "manager"
+        ? session.tenantId
+        : null;
+  if (!tenantId) return [];
+  const { data: schools } = await db.from("schools").select("id, name").eq("tenant_id", tenantId);
+  if (!schools?.length) return [];
+  const schoolMap = new Map(schools.map((s) => [s.id, s.name]));
+  const { data: classes } = await db.from("classes").select("id, name, school_id").in("school_id", schools.map((s) => s.id)).order("name");
+  return (classes ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    schoolName: schoolMap.get(c.school_id) ?? "—",
+  }));
+}

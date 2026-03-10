@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rua do Saber — paleta unificada */
+:root {
+  --font-sans: "Roboto", system-ui, sans-serif;
+  --rua-dark: #1a2a3d;
+  --rua-slate: #394e63;
+  --rua-cream: #f9eacd;
+  --rua-sky: #7dabe2;
+  --rua-red: #ff0037;
+  --rua-pale: #d8f0fa;
+  --rua-green: #045b24;
+  --rua-orange: #ff9100;
+  --rua-bg-guide: #283a4d;
+  --color-primary: #16a34a;
+  --color-primary-hover: #15803d;
+  --color-secondary: #0f766e;
+  --color-accent: #eab308;
+  --color-bg: var(--rua-dark);
+  --color-bg-elevated: var(--rua-bg-guide);
+  --color-bg-card: var(--rua-slate);
+  --color-text: var(--rua-cream);
+  --color-text-muted: #94a3b8;
+  --color-border: var(--rua-slate);
+  --kids-yellow: #fde047;
+  --kids-lime: #84cc16;
+  --kids-green: #22c55e;
+  --kids-orange: #fb923c;
+  --kids-pink: #f472b6;
+}
+
+body {
+  @apply antialiased;
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+input,
+textarea,
+select {
+  color: #0f172a;
+}
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+}

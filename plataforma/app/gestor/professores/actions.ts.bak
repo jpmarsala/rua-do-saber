@@ -1,0 +1,46 @@
+"use server";
+
+import { getSession } from "@/lib/auth/get-session";
+import { createServiceRoleClient } from "@/lib/supabase/server-service";
+import { revalidatePath } from "next/cache";
+
+function getEffectiveTenantId(tenantIdOverride: string | null | undefined, session: { role: string; tenantId: string | null }) {
+  if (session.role === "super_admin") return tenantIdOverride ?? session.tenantId;
+  if (session.role === "manager") return session.tenantId;
+  return null;
+}
+
+export async function inviteTeacher(
+  email: string,
+  fullName: string,
+  tenantIdOverride?: string | null
+) {
+  const session = await getSession();
+  if (!session) return { error: "Não autenticado" };
+  const tenantId = getEffectiveTenantId(tenantIdOverride, session);
+  if (!tenantId) return { error: "Nenhuma instituição selecionada" };
+
+  const supabase = createServiceRoleClient();
+  if (!supabase) return { error: "Serviço indisponível" };
+
+  const emailTrim = email.trim().toLowerCase();
+  if (!emailTrim) return { error: "E-mail é obrigatório" };
+
+  const { data: existing } = await supabase.from("profiles").select("id").eq("email", emailTrim).maybeSingle();
+  if (existing) return { error: "Já existe um usuário com este e-mail." };
+
+  const base = process.env.NEXT_PUBLIC_APP_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  const redirectTo = base ? `${base}/auth/callback` : undefined;
+  const { error } = await supabase.auth.admin.inviteUserByEmail(emailTrim, {
+    data: {
+      full_name: fullName.trim() || emailTrim.split("@")[0],
+      role: "teacher",
+      tenant_id: tenantId,
+    },
+    redirectTo,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/gestor");
+  revalidatePath("/gestor/professores");
+  return { data: { ok: true } };
+}
